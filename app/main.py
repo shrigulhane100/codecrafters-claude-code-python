@@ -59,27 +59,49 @@ def main():
         if not chat.choices or len(chat.choices) == 0:
             raise RuntimeError("no choices in response")
 
+        choice = chat.choices[0]
         message = chat.choices[0].message
         messages.append(message)
 
+        if choice.finish_reason == "stop":
+            if message.content:
+                print(message.content)
+            break
 
+        
         # Check if the LLM decided to call any tools
         if message.tool_calls and len(message.tool_calls) > 0:
             # Extract the first tool call
-            tool_call = message.tool_calls[0]
+            # tool_call = message.tool_calls[0]
+            
+            for tool_call in message.tool_calls:
 
-            if tool_call.function.name == "Read":
-                arguments = json.loads(tool_call.function.arguments)
-                file_path = arguments.get("file_path")
+                if tool_call.function.name == "Read":
+                    arguments = json.loads(tool_call.function.arguments)
+                    file_path = arguments.get("file_path")
 
-                try:
-                    with open(file_path, 'r') as file:
-                        print(file.read(), end="")
-                except FileNotFoundError:
-                    print(f"Error: File '{file_path}' not found.", file=sys.stderr)
-                except Exception as e:
-                    print(f"Error reading file: {e}", file=sys.stderr)
-        
+                    try:
+                        with open(file_path, 'r') as file:
+                            # print(file.read(), end="")
+                            tool_result = file.read()
+                    # except FileNotFoundError:
+                    #     print(f"Error: File '{file_path}' not found.", file=sys.stderr)
+                    # except Exception as e:
+                    #     print(f"Error reading file: {e}", file=sys.stderr)
+
+                    except FileNotFoundError:
+                        tool_result = f"Error: File '{file_path}' not found."
+                        print(tool_result, file=sys.stderr)
+                    except Exception as e:
+                        tool_result = f"Error reading file: {e}"
+                        print(tool_result, file=sys.stderr)
+
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": tool_result
+                    })
+            
         else:
             if message.content:
                 print(message.content)
