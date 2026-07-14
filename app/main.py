@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import json
 
 from openai import OpenAI
 
@@ -21,28 +22,51 @@ def main():
     chat = client.chat.completions.create(
         model="anthropic/claude-haiku-4.5",
         messages=[{"role": "user", "content": args.p}],
-        tools=[{
-            "type": "function",
-            "function": {
-                "name": "Read",
-                "description": "Read and return the contents of a file",
-                "parameters": {
+            tools=[{
                 "type": "function",
-                "properties": {
-                    "file_path": {
-                    "type": "string",
-                    "description": "The path to the file to read"
+                "function": {
+                    "name": "Read",
+                    "description": "Read and return the contents of a file",
+                    "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                        "type": "string",
+                        "description": "The path to the file to read"
+                        }
+                    },
+                    "required": ["file_path"]
                     }
-                },
-                "required": ["file_path"]
                 }
-            }
-            
-        }]
+            }        
+        ]
     )
 
     if not chat.choices or len(chat.choices) == 0:
         raise RuntimeError("no choices in response")
+
+    message = chat.choices[0].message
+
+    # Check if the LLM decided to call any tools
+    if message.tool_calls and len(message.tool_calls) > 0:
+        # Extract the first tool call
+        tool_call = message.tool_calls[0]
+
+        if tool_call.function.name == "Read":
+            arguments = json.loads(tool_call.function.arguments)
+            file_path = arguments.get("file_path")
+
+            try:
+                with open(file_path, 'r') as file:
+                    print(file.read(), end="")
+            except FileNotFoundError:
+                print(f"Error: File '{file_path}' not found.", file=sys.stderr)
+            except Exception as e:
+                print(f"Error reading file: {e}", file=sys.stderr)
+    
+    else:
+        if message.content:
+            print(message.content)
 
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
