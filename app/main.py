@@ -58,7 +58,7 @@ def main():
 
             try:
                 with open(file_path, 'r') as file:
-                    print(file.read())
+                    print(file.read(), end="")
             except FileNotFoundError:
                 print(f"Error: File '{file_path}' not found.", file=sys.stderr)
             except Exception as e:
