@@ -58,15 +58,15 @@ def main():
             raise RuntimeError("no choices in response")
 
         choice = chat.choices[0]
-        message = chat.choices[0].message
+        response_message = choice.message
 
-        assistant_message = {
-            "role": "assistant",
-            "content": message.content if message.content is not None else ""
+        message_dict = {
+            "role": response_message.role,
+            "content": response_message.content,
         }
 
-        if message.tool_calls:
-            assistant_message["tool_calls"] = [
+        if hasattr(response_message, "tool_calls") and response_message.tool_calls:
+            message_dict["tool_calls"] = [
                 {
                     "id": tc.id,
                     "type": tc.type,
@@ -74,54 +74,73 @@ def main():
                         "name": tc.function.name,
                         "arguments": tc.function.arguments
                     }
-                } for tc in message.tool_calls
+                } for tc in response_message.tool_calls
             ]
 
-        messages.append(assistant_message)
+        messages.append(message_dict)
 
-        if choice.finish_reason == "stop" or not message.tool_calls:
-            if message.content:
-                print(message.content)
+        if choice.finish_reason == "stop" or not message_dict.get("tool_calls"):
+            print(response_message.content)
             break
 
         
         # Check if the LLM decided to call any tools
-        if message.tool_calls and len(message.tool_calls) > 0:
+        # if message.tool_calls and len(message.tool_calls) > 0:
             # Extract the first tool call
             # tool_call = message.tool_calls[0]
             
-            for tool_call in message.tool_calls:
+        #     for tool_call in message.tool_calls:
 
-                if tool_call.function.name == "Read":
-                    arguments = json.loads(tool_call.function.arguments)
-                    file_path = arguments.get("file_path")
+        #         if tool_call.function.name == "Read":
+        #             arguments = json.loads(tool_call.function.arguments)
+        #             file_path = arguments.get("file_path")
 
-                    try:
-                        with open(file_path, 'r') as file:
-                            # print(file.read(), end="")
-                            tool_result = file.read()
-                    # except FileNotFoundError:
-                    #     print(f"Error: File '{file_path}' not found.", file=sys.stderr)
-                    # except Exception as e:
-                    #     print(f"Error reading file: {e}", file=sys.stderr)
+        #             try:
+        #                 with open(file_path, 'r') as file:
+        #                     # print(file.read(), end="")
+        #                     tool_result = file.read()
+        #             # except FileNotFoundError:
+        #             #     print(f"Error: File '{file_path}' not found.", file=sys.stderr)
+        #             # except Exception as e:
+        #             #     print(f"Error reading file: {e}", file=sys.stderr)
 
-                    except FileNotFoundError:
-                        tool_result = f"Error: File '{file_path}' not found."
-                        print(tool_result, file=sys.stderr)
-                    except Exception as e:
-                        tool_result = f"Error reading file: {e}"
-                        print(tool_result, file=sys.stderr)
+        #             except FileNotFoundError:
+        #                 tool_result = f"Error: File '{file_path}' not found."
+        #                 print(tool_result, file=sys.stderr)
+        #             except Exception as e:
+        #                 tool_result = f"Error reading file: {e}"
+        #                 print(tool_result, file=sys.stderr)
 
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_result
-                    })
+        #             messages.append({
+        #                 "role": "tool",
+        #                 "tool_call_id": tool_call.id,
+        #                 "content": tool_result
+        #             })
             
-        else:
-            if message.content:
-                print(message.content)
-            break
+        # else:
+        #     if message.content:
+        #         print(message.content)
+        #     break
+
+        for tc in response_message.tool_calls:
+            if tc.function.name == "Read":
+                args_dict = json.loads(tc.function.arguments)
+                
+                # FIX 3: Catch file errors and feed them back to the LLM so it doesn't get stuck
+                try:
+                    with open(args_dict["file_path"], "r") as f:
+                        result = f.read()
+                except Exception as e:
+                    result = f"Error: Could not read file. {str(e)}"
+                    
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result,
+                    }
+                )
+
 
     # # You can use print statements as follows for debugging, they'll be visible when running tests.
     # print("Logs from your program will appear here!", file=sys.stderr)
