@@ -61,9 +61,27 @@ def main():
 
         choice = chat.choices[0]
         message = chat.choices[0].message
-        messages.append(message)
 
-        if choice.finish_reason == "stop":
+        assistant_message = {
+            "role": "assistant",
+            "content": message.content if message.content is not None else ""
+        }
+
+        if message.tool_calls:
+            assistant_message["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments
+                    }
+                } for tc in message.tool_calls
+            ]
+
+        messages.append(assistant_message)
+
+        if choice.finish_reason == "stop" or not message.tool_calls:
             if message.content:
                 print(message.content)
             break
