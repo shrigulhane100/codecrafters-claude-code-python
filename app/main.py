@@ -18,9 +18,9 @@ def main():
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
-    messages = [{"role":"user", "content": args.p}]
+    messages = [{"role":"user", "content": args.p}]  
 
-    read_tool = {
+    tools = [{
                 "type": "function",
                 "function": {
                     "name": "Read",
@@ -36,9 +36,7 @@ def main():
                     "required": ["file_path"]
                     }
                 }
-            }    
-
-    tools = [read_tool]
+            }]
 
 
     # chat = client.chat.completions.create(
@@ -54,7 +52,7 @@ def main():
         chat = client.chat.completions.create(
         model="anthropic/claude-haiku-4.5",
         messages=[{"role": "user", "content": args.p}],
-        tools=[read_tool])
+        tools=tools)
 
         if not chat.choices or len(chat.choices) == 0:
             raise RuntimeError("no choices in response")
